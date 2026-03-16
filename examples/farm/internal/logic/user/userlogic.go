@@ -2,14 +2,15 @@ package user
 
 import (
 	"context"
+	"crypto/sha256"
 	"errors"
 	"fmt"
 	"time"
 
 	"github.com/golang-jwt/jwt/v4"
+	"github.com/zeromicro/go-zero/core/logx"
 	"github.com/zeromicro/go-zero/examples/farm/internal/svc"
 	"github.com/zeromicro/go-zero/examples/farm/internal/types"
-	"github.com/zeromicro/go-zero/core/logx"
 )
 
 // RegisterLogic handles user registration.
@@ -52,7 +53,7 @@ func (l *RegisterLogic) Register(req *types.RegisterRequest) (*types.RegisterRes
 	// Persist the user record.
 	if err := l.svcCtx.Redis.HmsetCtx(l.ctx, userKey, map[string]string{
 		"userId":   userId,
-		"password": req.Password,
+		"password": hashPassword(userId, req.Password),
 	}); err != nil {
 		return nil, fmt.Errorf("failed to save user: %w", err)
 	}
@@ -90,13 +91,13 @@ func (l *LoginLogic) Login(req *types.LoginRequest) (*types.LoginResponse, error
 		return nil, errors.New("invalid username or password")
 	}
 
-	if storedPassword != req.Password {
-		return nil, errors.New("invalid username or password")
+	userId, err := l.svcCtx.Redis.HgetCtx(l.ctx, userKey, "userId")
+	if err != nil || userId == "" {
+		return nil, fmt.Errorf("failed to load user: %w", err)
 	}
 
-	userId, err := l.svcCtx.Redis.HgetCtx(l.ctx, userKey, "userId")
-	if err != nil {
-		return nil, fmt.Errorf("failed to load user: %w", err)
+	if storedPassword != hashPassword(userId, req.Password) {
+		return nil, errors.New("invalid username or password")
 	}
 
 	now := time.Now().Unix()
@@ -123,4 +124,13 @@ func generateToken(secret, userId string, expireAt int64) (string, error) {
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	return token.SignedString([]byte(secret))
+}
+
+// hashPassword derives a salted SHA-256 digest from a plain-text password.
+// NOTE: In production use a dedicated password hashing algorithm such as bcrypt
+// or Argon2 (golang.org/x/crypto/bcrypt) which includes adaptive cost factors.
+func hashPassword(userId, password string) string {
+	h := sha256.New()
+	h.Write([]byte(userId + ":" + password))
+	return fmt.Sprintf("%x", h.Sum(nil))
 }
