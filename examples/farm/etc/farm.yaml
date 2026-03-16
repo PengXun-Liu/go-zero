@@ -1,0 +1,13 @@
+Name: farm
+Host: 0.0.0.0
+Port: 8888
+
+# JWT secret for signing tokens (change this in production!)
+Auth:
+  AccessSecret: "your-secret-key-change-in-production"
+  AccessExpire: 86400  # 24 hours in seconds
+
+# Redis configuration for storing game state
+Redis:
+  Host: localhost:6379
+  Type: node
