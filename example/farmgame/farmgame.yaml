@@ -1,0 +1,9 @@
+Name: farmgame
+Host: 0.0.0.0
+Port: 8888
+Timeout: 5000  # request timeout in milliseconds
+
+Redis:
+  Host: 127.0.0.1:6379
+  Type: node
+  # Pass: your_redis_password   # uncomment if authentication is required
